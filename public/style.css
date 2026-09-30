@@ -52,7 +52,12 @@ a { color: inherit; }
 .buzz { width: 30px; height: 30px; border-radius: 50%; background: var(--accent); box-shadow: inset 0 -4px 0 rgba(0,0,0,.25), 0 0 0 4px var(--ink); }
 .top-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .sound-btn { width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--ink); background: var(--surface); color: var(--ink); font-size: 1rem; line-height: 1; cursor: pointer; display: grid; place-items: center; font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif; }
-.sound-btn[aria-pressed="false"] { opacity: .6; border-style: dashed; }
+.sound-btn.off { opacity: .6; border-style: dashed; }
+.vol-wrap { position: relative; }
+.vol-pop { position: absolute; top: calc(100% + 8px); right: 0; z-index: 20; width: min(240px, calc(100vw - 32px)); background: var(--surface); border: 2px solid var(--ink); border-radius: 14px; padding: 12px 14px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 8px; }
+.vol-row { display: flex; align-items: center; gap: 10px; }
+.vol-row input[type="range"] { flex: 1; min-width: 0; padding: 0; border: 0; background: transparent; accent-color: var(--accent); height: 28px; }
+.vol-row span { min-width: 4ch; text-align: right; font-size: .85rem; }
 .lang { display: flex; border: 2px solid var(--ink); border-radius: 999px; padding: 2px; background: var(--surface); }
 .lang button { border: 0; background: transparent; color: var(--ink); font: 700 .8rem var(--f-body); letter-spacing: .06em; padding: 4px 10px; border-radius: 999px; cursor: pointer; }
 .lang button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
@@ -133,6 +138,8 @@ input.code-input { font-family: var(--f-mono); font-weight: 700; letter-spacing:
 .timer.low { color: var(--accent); }
 .bar { height: 10px; border-radius: 999px; background: var(--bg); border: 2px solid var(--ink); overflow: hidden; }
 .bar i { display: block; height: 100%; width: 100%; background: var(--ink); transform-origin: left; }
+.next-bar { height: 6px; border-radius: 999px; background: var(--bg); overflow: hidden; }
+.next-bar i { display: block; height: 100%; width: 100%; background: var(--muted); transform-origin: left; }
 .qtext { font-size: clamp(1.3rem, 3.6vw, 1.9rem); }
 .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 @media (max-width: 540px) { .tiles { grid-template-columns: 1fr; } }

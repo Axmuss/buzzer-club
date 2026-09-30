@@ -59,13 +59,30 @@ function applyStatic() {
   $('#foot-scoring').textContent = t('foot.scoring');
   $('#foot-builder').textContent = t('foot.builder');
   $('#lang').setAttribute('aria-label', t('lang.label'));
-  const snd = $('#sound');
-  snd.setAttribute('aria-pressed', !Sound.muted);
-  snd.setAttribute('aria-label', Sound.muted ? t('sound.unmute') : t('sound.mute'));
-  snd.title = snd.getAttribute('aria-label');
-  snd.firstElementChild.textContent = Sound.muted ? '🔇' : '🔊';
+  $('#sound').setAttribute('aria-label', t('sound.volume'));
+  $('#sound').title = t('sound.volume');
+  $('#vol-label').textContent = t('sound.volume');
+  showVolume();
   for (const b of document.querySelectorAll('[data-lang]')) b.setAttribute('aria-pressed', b.dataset.lang === LANG);
 }
+
+/* ---------- volume ---------- */
+function showVolume() {
+  const v = Sound.volume, pct = Math.round(v * 100);
+  $('#sound').firstElementChild.textContent = v === 0 ? '🔇' : v < 0.34 ? '🔈' : v < 0.67 ? '🔉' : '🔊';
+  $('#sound').classList.toggle('off', v === 0);
+  $('#vol').value = pct;
+  $('#vol-val').textContent = pct + '%';
+}
+function toggleVolume(open) {
+  const pop = $('#vol-pop');
+  pop.hidden = open === undefined ? !pop.hidden : !open;
+  $('#sound').setAttribute('aria-expanded', !pop.hidden);
+}
+// Close the volume popover when tapping anywhere else.
+document.addEventListener('pointerdown', e => {
+  if (!$('#vol-pop').hidden && !e.target.closest('.vol-wrap')) toggleVolume(false);
+});
 
 /* ---------- connection ---------- */
 const socket = io({ auth: { playerId: playerId() } });
@@ -415,16 +432,23 @@ function revealView(st) {
     : `<div class="result bad"><strong>${t('notThisTime')}</strong><span>${answerWas}</span></div>`;
   const last = st.index + 1 >= st.total;
   return `<section class="stage">
-    <p class="eyebrow">${t('qOf', { i: st.index + 1, n: st.total })} · ${t('theAnswer')}</p>
+    <div class="qtop"><span class="eyebrow">${t('qOf', { i: st.index + 1, n: st.total })} · ${t('theAnswer')}</span></div>
+    <div class="next-bar" aria-hidden="true"><i id="nbar"></i></div>
+    <p class="status" id="next-in" data-last="${last}">${nextInText(st)}</p>
     <h1 class="qtext">${esc(q.q)}</h1>
     <div class="tiles">${tiles}</div>
     ${res}
     <h2>${t('leaderboard')}</h2>
     ${boardView(st, true)}
     ${st.you?.isHost
-      ? `<div class="row"><button class="btn primary big" data-act="next">${last ? t('showFinal') : t('next')}</button></div>`
+      ? `<div class="row"><button class="btn primary" data-act="next">${last ? t('resultsNow') : t('nextNow')}</button></div>`
       : guestLine(st)}
   </section>`;
+}
+const nextLeftMs = st => Math.max(0, (st.nextAt || 0) - serverNow());
+function nextInText(st) {
+  const n = Math.ceil(nextLeftMs(st) / 1000);
+  return t(st.index + 1 >= st.total ? 'resultsIn' : 'nextIn', { n });
 }
 
 function finalView(st) {
@@ -457,7 +481,14 @@ function finalView(st) {
 
 function tick() {
   const st = S.st;
-  if (S.route !== 'room' || !st || st.status !== 'question') return;
+  if (S.route !== 'room' || !st) return;
+  if (st.status === 'reveal' && st.nextAt) {
+    const el = $('#next-in'), bar = $('#nbar');
+    if (el) el.textContent = nextInText(st);
+    if (bar) bar.style.transform = `scaleX(${Math.min(1, nextLeftMs(st) / (st.revealMs || 8000))})`;
+    return;
+  }
+  if (st.status !== 'question') return;
   const left = timeLeftMs();
   const lim = st.question.t * 1000;
   const n = $('#tnum'), b = $('#tbar');
@@ -638,7 +669,7 @@ document.addEventListener('click', e => {
   const d = S.admin.draft;
   switch (a) {
     case 'lang': setLang(b.dataset.lang); break;
-    case 'sound': Sound.setMuted(!Sound.muted); applyStatic(); Sound.play('lock'); break;
+    case 'sound': toggleVolume(); break;
     case 'host': host(id); break;
     case 'join': join(S.joinCode); break;
     case 'join-code': join(($('#join-code') || {}).value); break;
@@ -678,6 +709,12 @@ document.addEventListener('click', e => {
 
 function onField(e) {
   const el = e.target;
+  if (el.id === 'vol') {
+    Sound.setVolume(el.value / 100);
+    showVolume();
+    if (e.type === 'change') Sound.play('lock'); // a short sample at the new level once the slider is released
+    return;
+  }
   if (el.id === 'nick') { S.nick = el.value; lsSet('bc-nick', el.value); return; }
   if (el.id === 'join-code') { S.joinCode = el.value.toUpperCase(); return; }
   const f = el.dataset.f; if (!f) return;
