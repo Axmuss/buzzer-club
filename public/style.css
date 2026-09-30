@@ -28,6 +28,8 @@
   }
 }
 * { box-sizing: border-box; }
+/* Elements toggled with the hidden attribute must stay hidden even when a class gives them display:flex or grid. */
+[hidden] { display: none !important; }
 /* Touch screens: no double-tap zoom or grey flash on buttons, and no accidental text selection on game tiles. */
 button, a, input, select, textarea { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 .tile, .av-btn, .lang button { -webkit-user-select: none; user-select: none; }
