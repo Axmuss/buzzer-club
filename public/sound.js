@@ -3,8 +3,13 @@
 // Browsers only allow audio after the player touches the page, so the audio context is unlocked on the first tap/click.
 const Sound = (() => {
   let ctx = null, master = null;
-  let muted = false;
-  try { muted = localStorage.getItem('bc-muted') === '1'; } catch {}
+  // Volume 0..1, remembered per device. Devices muted with the older on/off button start at 0.
+  let volume = 0.7;
+  try {
+    const saved = localStorage.getItem('bc-volume');
+    if (saved !== null && !isNaN(+saved)) volume = Math.min(1, Math.max(0, +saved));
+    else if (localStorage.getItem('bc-muted') === '1') volume = 0;
+  } catch {}
 
   function ensure() {
     if (!ctx) {
@@ -12,7 +17,7 @@ const Sound = (() => {
       if (!AC) return null;
       ctx = new AC();
       master = ctx.createGain();
-      master.gain.value = 0.9;
+      master.gain.value = volume;
       master.connect(ctx.destination);
     }
     if (ctx.state === 'suspended') ctx.resume().catch(() => {});
@@ -54,14 +59,15 @@ const Sound = (() => {
 
   return {
     play(name) {
-      if (muted || !SOUNDS[name]) return;
+      if (volume === 0 || !SOUNDS[name]) return;
       if (!ensure()) return;
       try { SOUNDS[name](); } catch {}
     },
-    get muted() { return muted; },
-    setMuted(m) {
-      muted = !!m;
-      try { localStorage.setItem('bc-muted', muted ? '1' : '0'); } catch {}
+    get volume() { return volume; },
+    setVolume(v) {
+      volume = Math.min(1, Math.max(0, +v || 0));
+      if (master) master.gain.setTargetAtTime(volume, ctx.currentTime, 0.02);
+      try { localStorage.setItem('bc-volume', String(volume)); } catch {}
     },
   };
 })();

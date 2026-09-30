@@ -4,8 +4,7 @@
 const I18N = {
   en: {
     'lang.label': 'Language',
-    'sound.mute': 'Mute sounds',
-    'sound.unmute': 'Turn sounds on',
+    'sound.volume': 'Sound volume',
     'conn.reconnecting': 'Reconnecting…',
     'foot.scoring': 'Each question scores up to 1000 points. Faster correct answers score more.',
     'foot.builder': 'Quiz builder',
@@ -93,8 +92,10 @@ const I18N = {
     'points': { one: '+{n} point', other: '+{n} points' },
     'notThisTime': 'Not this time',
     'leaderboard': 'Leaderboard',
-    'next': 'Next question',
-    'showFinal': 'Show final results',
+    'nextIn': 'Next question in {n} s',
+    'resultsIn': 'Final results in {n} s',
+    'nextNow': 'Next question now',
+    'resultsNow': 'Show results now',
 
     'finalResults': 'Final results',
     'pts': '{n} pts',
@@ -160,8 +161,7 @@ const I18N = {
 
   ru: {
     'lang.label': 'Язык',
-    'sound.mute': 'Выключить звук',
-    'sound.unmute': 'Включить звук',
+    'sound.volume': 'Громкость',
     'conn.reconnecting': 'Переподключение…',
     'foot.scoring': 'За каждый вопрос — до 1000 очков. Чем быстрее верный ответ, тем больше очков.',
     'foot.builder': 'Конструктор викторин',
@@ -249,8 +249,10 @@ const I18N = {
     'points': { one: '+{n} очко', few: '+{n} очка', many: '+{n} очков', other: '+{n} очка' },
     'notThisTime': 'Не в этот раз',
     'leaderboard': 'Таблица лидеров',
-    'next': 'Следующий вопрос',
-    'showFinal': 'Показать итоги',
+    'nextIn': 'Следующий вопрос через {n} с',
+    'resultsIn': 'Итоги через {n} с',
+    'nextNow': 'Дальше сейчас',
+    'resultsNow': 'Показать итоги сейчас',
 
     'finalResults': 'Итоги',
     'pts': '{n} оч.',

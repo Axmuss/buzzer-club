@@ -18,6 +18,7 @@ const TIMES = [10, 15, 20, 30, 45];
 const MAX_PLAYERS = 50;
 const ROOM_IDLE_MS = 30 * 60 * 1000;
 const GRACE_MS = 300;
+const REVEAL_MS = 8000; // how long the answer and leaderboard stay up before the game moves on by itself
 const PUBLIC = path.join(__dirname, 'public');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -162,7 +163,7 @@ function view(room, pid) {
   return {
     code: room.code, status: room.status, quizId: room.quiz.id, quizTitle: room.quiz.title,
     total: room.quiz.questions.length, index: room.index,
-    serverNow: Date.now(), endsAt: room.endsAt,
+    serverNow: Date.now(), endsAt: room.endsAt, nextAt: room.status === 'reveal' ? room.nextAt : 0, revealMs: REVEAL_MS,
     hostConnected: !!host && isConnected(host),
     you: me ? { pubId: me.pubId, isHost: pid === room.hostId, answer: myAns ? myAns.c : null, points: revealed ? pointsFor(q, myAns) : 0 } : null,
     players: standings(room),
@@ -201,7 +202,18 @@ function reveal(room) {
   if (room.status !== 'question') return;
   clearTimeout(room.timer);
   room.status = 'reveal';
+  room.nextAt = Date.now() + REVEAL_MS;
+  room.timer = setTimeout(() => advance(room), REVEAL_MS);
   broadcast(room);
+}
+
+// Next question, or the final results after the last one. Runs on its own after the reveal; the host can skip ahead.
+function advance(room) {
+  if (room.status !== 'reveal') return;
+  clearTimeout(room.timer);
+  room.nextAt = 0;
+  if (room.index + 1 < room.quiz.questions.length) startQuestion(room, room.index + 1);
+  else { room.status = 'final'; broadcast(room); }
 }
 
 function revealIfEveryoneAnswered(room) {
@@ -219,6 +231,7 @@ function resetForNewRound(room) {
   room.status = 'lobby';
   room.index = -1;
   room.endsAt = 0;
+  room.nextAt = 0;
 }
 
 function snapshotQuiz(quiz) {
@@ -350,8 +363,7 @@ io.on('connection', socket => {
   on('game:next', async () => {
     const room = hostRoom();
     if (!room || room.status !== 'reveal') return;
-    if (room.index + 1 < room.quiz.questions.length) startQuestion(room, room.index + 1);
-    else { room.status = 'final'; broadcast(room); }
+    advance(room);
   });
 
   on('game:rematch', async () => {
