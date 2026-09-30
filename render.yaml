@@ -3,6 +3,7 @@ services:
     name: buzzer-club
     runtime: node
     plan: free
+    region: frankfurt
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /healthz
