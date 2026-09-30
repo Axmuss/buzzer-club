@@ -59,6 +59,11 @@ function applyStatic() {
   $('#foot-scoring').textContent = t('foot.scoring');
   $('#foot-builder').textContent = t('foot.builder');
   $('#lang').setAttribute('aria-label', t('lang.label'));
+  const snd = $('#sound');
+  snd.setAttribute('aria-pressed', !Sound.muted);
+  snd.setAttribute('aria-label', Sound.muted ? t('sound.unmute') : t('sound.mute'));
+  snd.title = snd.getAttribute('aria-label');
+  snd.firstElementChild.textContent = Sound.muted ? '🔇' : '🔊';
   for (const b of document.querySelectorAll('[data-lang]')) b.setAttribute('aria-pressed', b.dataset.lang === LANG);
 }
 
@@ -76,8 +81,18 @@ socket.on('connect', () => {
   if (S.st) resume(S.st.code);
 });
 socket.on('disconnect', () => { $('#conn').hidden = false; });
+// Sounds for changes between two game states. Nothing plays on the first state after (re)loading the page.
+function playTransitionSounds(prev, st) {
+  if (!prev || prev.code !== st.code) return;
+  if (st.status === 'question' && (prev.status !== 'question' || prev.index !== st.index)) Sound.play('start');
+  else if (st.status === 'reveal' && prev.status !== 'reveal') Sound.play(st.you?.points ? 'correct' : 'wrong');
+  else if (st.status === 'final' && prev.status !== 'final') Sound.play('fanfare');
+  else if (st.status === 'lobby' && prev.status === 'lobby' && st.players.length > prev.players.length) Sound.play('join');
+}
+
 socket.on('state', st => {
   const prevKey = S.st ? S.st.code + ':' + S.st.index : null;
+  playTransitionSounds(S.st, st);
   S.st = st;
   S.offset = st.serverNow - Date.now();
   if (prevKey !== st.code + ':' + st.index || st.you?.answer != null) S.pending = null;
@@ -89,12 +104,29 @@ socket.on('state', st => {
   }
   if (st.status === 'final' && st.you?.isHost && !S.quizzes) loadQuizzes();
   render();
+  syncWakeLock();
 });
 socket.on('closed', () => {
-  S.st = null; lsSet('bc-room', '');
+  S.st = null; lsSet('bc-room', ''); syncWakeLock();
   go('/');
   notice(t('closed'));
 });
+
+// Keep phone screens awake while in a game (they otherwise lock during a 30 s question). Browsers drop the lock
+// when the tab is hidden, so ask again when it comes back. Unsupported browsers simply skip this.
+let wakeLock = null;
+async function syncWakeLock() {
+  const want = !!S.st && document.visibilityState === 'visible';
+  if (want && !wakeLock && navigator.wakeLock) {
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } catch { wakeLock = null; }
+  } else if (!want && wakeLock) {
+    wakeLock.release().catch(() => {}); wakeLock = null;
+  }
+}
+document.addEventListener('visibilitychange', syncWakeLock);
 
 async function resume(code) {
   const r = await call('room:resume', { code });
@@ -178,13 +210,14 @@ async function answer(c) {
   const st = S.st;
   if (!st || st.status !== 'question' || st.you?.answer != null || S.pending || timeLeftMs() <= 0) return;
   S.pending = { key: st.code + ':' + st.index, c };
+  Sound.play('lock');
   render();
   const r = await call('game:answer', { c });
   if (r.error) { S.pending = null; notice(errText(r)); render(); }
 }
 async function leave() {
   await call('room:leave');
-  S.st = null; lsSet('bc-room', '');
+  S.st = null; lsSet('bc-room', ''); syncWakeLock();
   go('/');
 }
 async function chooseAvatar(a) {
@@ -431,6 +464,11 @@ function tick() {
   if (n) { const s = Math.max(0, Math.ceil(left / 1000)); n.textContent = s; n.classList.toggle('low', s <= 5); }
   if (b) b.style.transform = `scaleX(${Math.max(0, Math.min(1, left / lim))})`;
   const key = st.code + ':' + st.index;
+  const secs = Math.ceil(left / 1000);
+  if (secs >= 1 && secs <= 5 && S.tickKey !== key + ':' + secs) {
+    S.tickKey = key + ':' + secs;
+    Sound.play(secs <= 3 ? 'tickHigh' : 'tick');
+  }
   if (left <= 0 && S.timeUpKey !== key) { S.timeUpKey = key; render(); }
 }
 setInterval(tick, 200);
@@ -600,6 +638,7 @@ document.addEventListener('click', e => {
   const d = S.admin.draft;
   switch (a) {
     case 'lang': setLang(b.dataset.lang); break;
+    case 'sound': Sound.setMuted(!Sound.muted); applyStatic(); Sound.play('lock'); break;
     case 'host': host(id); break;
     case 'join': join(S.joinCode); break;
     case 'join-code': join(($('#join-code') || {}).value); break;
