@@ -1,0 +1,38 @@
+[
+  {
+    "id": "quiz-around-the-world",
+    "title": "Around the World",
+    "blurb": "Capitals, rivers, borders and deserts. A geography warm-up.",
+    "updatedAt": 1790778500000,
+    "questions": [
+      { "q": "What is the capital of Australia?", "o": ["Sydney", "Melbourne", "Canberra", "Perth"], "c": 2, "t": 15 },
+      { "q": "Riga is the capital of which country?", "o": ["Lithuania", "Latvia", "Estonia", "Finland"], "c": 1, "t": 15 },
+      { "q": "Which river flows through Baghdad?", "o": ["Nile", "Tigris", "Jordan", "Indus"], "c": 1, "t": 20 },
+      { "q": "What is the smallest country in the world by area?", "o": ["Monaco", "Vatican City", "San Marino", "Liechtenstein"], "c": 1, "t": 15 },
+      { "q": "Which country has the most time zones, counting overseas territories?", "o": ["Russia", "United States", "France", "China"], "c": 2, "t": 20 },
+      { "q": "What is the longest mountain range on land?", "o": ["Himalayas", "Rocky Mountains", "Andes", "Alps"], "c": 2, "t": 20 },
+      { "q": "What is the largest hot desert in the world?", "o": ["Gobi", "Kalahari", "Sahara", "Arabian"], "c": 2, "t": 15 },
+      { "q": "Mount Kilimanjaro is in which country?", "o": ["Kenya", "Tanzania", "Uganda", "Ethiopia"], "c": 1, "t": 20 },
+      { "q": "Which two countries share the world's longest international border?", "o": ["USA and Canada", "Russia and Kazakhstan", "Chile and Argentina", "China and Mongolia"], "c": 0, "t": 20 },
+      { "q": "Which sea has no coastline at all?", "o": ["Sargasso Sea", "Caspian Sea", "Coral Sea", "Tasman Sea"], "c": 0, "t": 20 }
+    ]
+  },
+  {
+    "id": "quiz-science-space",
+    "title": "Science & Space",
+    "blurb": "From the periodic table to the outer planets.",
+    "updatedAt": 1790778500000,
+    "questions": [
+      { "q": "What is the chemical symbol for gold?", "o": ["Ag", "Au", "Gd", "Go"], "c": 1, "t": 15 },
+      { "q": "Which planet has the most confirmed moons?", "o": ["Jupiter", "Saturn", "Uranus", "Neptune"], "c": 1, "t": 20 },
+      { "q": "Roughly how long does sunlight take to reach Earth?", "o": ["8 seconds", "8 minutes", "8 hours", "1 minute"], "c": 1, "t": 15 },
+      { "q": "What is the hardest natural substance?", "o": ["Quartz", "Topaz", "Diamond", "Titanium"], "c": 2, "t": 15 },
+      { "q": "Which gas makes up most of Earth's atmosphere?", "o": ["Oxygen", "Carbon dioxide", "Argon", "Nitrogen"], "c": 3, "t": 15 },
+      { "q": "How many bones are in the adult human body?", "o": ["186", "206", "226", "256"], "c": 1, "t": 20 },
+      { "q": "Which part of a cell is called its powerhouse?", "o": ["Nucleus", "Ribosome", "Mitochondria", "Golgi apparatus"], "c": 2, "t": 15 },
+      { "q": "Which planet rotates on its side?", "o": ["Venus", "Uranus", "Neptune", "Mars"], "c": 1, "t": 20 },
+      { "q": "Roughly how fast does light travel?", "o": ["300,000 km/s", "30,000 km/s", "3,000,000 km/s", "150,000 km/s"], "c": 0, "t": 20 },
+      { "q": "Who developed the theory of general relativity?", "o": ["Isaac Newton", "Niels Bohr", "Albert Einstein", "Stephen Hawking"], "c": 2, "t": 15 }
+    ]
+  }
+]

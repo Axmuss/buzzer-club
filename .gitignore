@@ -1,0 +1,6 @@
+node_modules/
+data/quizzes.json
+data/quizzes.json.tmp
+.env
+data/quizzes.local.json
+data/quizzes.local.json.tmp
