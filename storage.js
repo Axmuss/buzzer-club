@@ -17,6 +17,7 @@ async function initMongo(seed) {
   const { MongoClient } = require('mongodb');
   const client = new MongoClient(process.env.MONGODB_URI);
   await client.connect();
+  // Database keeps its original name from before the rename to Quiz Club; changing it would hide saved quizzes.
   const col = client.db(process.env.MONGODB_DB || 'buzzerclub').collection('quizzes');
   if ((await col.countDocuments()) === 0 && seed.length) {
     await col.insertMany(seed.map(({ id, ...rest }) => ({ _id: id, ...rest })));

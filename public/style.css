@@ -46,6 +46,10 @@ a { color: inherit; }
 .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .brand { display: flex; align-items: center; gap: 10px; font-family: var(--f-display); font-weight: 800; font-size: 1.2rem; text-decoration: none; }
 .buzz { width: 30px; height: 30px; border-radius: 50%; background: var(--accent); box-shadow: inset 0 -4px 0 rgba(0,0,0,.25), 0 0 0 4px var(--ink); }
+.top-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.lang { display: flex; border: 2px solid var(--ink); border-radius: 999px; padding: 2px; background: var(--surface); }
+.lang button { border: 0; background: transparent; color: var(--ink); font: 700 .8rem var(--f-body); letter-spacing: .06em; padding: 4px 10px; border-radius: 999px; cursor: pointer; }
+.lang button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
 .conn { font-size: .85rem; font-weight: 700; color: var(--bad); border: 2px solid var(--bad); border-radius: 999px; padding: 2px 10px; }
 
 /* controls */
@@ -100,6 +104,17 @@ input.code-input { font-family: var(--f-mono); font-weight: 700; letter-spacing:
 .roster li { border: 2px solid var(--ink); border-radius: 999px; padding: 5px 12px; font-weight: 700; background: var(--bg); display: flex; gap: 6px; align-items: center; max-width: 100%; }
 .roster li.me { background: var(--ink); color: var(--bg); }
 .roster li.away { opacity: .45; border-style: dashed; }
+.roster li { padding-left: 5px; }
+.roster .rname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* avatars */
+.av { flex: none; display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--surface); border: 2px solid var(--line); font-size: 1.05rem; line-height: 1; font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif; }
+.roster li.me .av { border-color: var(--bg); }
+.av.big { width: 56px; height: 56px; font-size: 1.9rem; border-color: var(--ink); }
+.avatar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 6px; max-width: 560px; }
+.av-btn { aspect-ratio: 1; min-width: 0; font-size: 1.45rem; line-height: 1; border: 2px solid var(--line); border-radius: 12px; background: var(--surface); cursor: pointer; font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif; transition: transform .08s; }
+.av-btn:hover { transform: scale(1.08); }
+.av-btn[aria-pressed="true"] { border-color: var(--ink); background: var(--bg); box-shadow: 0 0 0 2px var(--ink); }
 .roster .tag { font-size: .7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; opacity: .7; }
 .hostline { color: var(--muted); font-size: .92rem; }
 .share { display: flex; flex-direction: column; gap: 8px; background: var(--bg); border: 2px dashed var(--ink); border-radius: 14px; padding: 14px; }
@@ -145,7 +160,7 @@ input.code-input { font-family: var(--f-mono); font-weight: 700; letter-spacing:
 
 /* leaderboard */
 .board { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.board li { display: grid; grid-template-columns: 2.2em 1fr auto auto; gap: 10px; align-items: center; padding: 8px 12px; border-radius: 10px; background: var(--bg); font-weight: 600; }
+.board li { display: grid; grid-template-columns: 1.6em auto 1fr auto auto; gap: 10px; align-items: center; padding: 8px 12px; border-radius: 10px; background: var(--bg); font-weight: 600; }
 .board li.me { outline: 2px solid var(--ink); }
 .board .rank { font-family: var(--f-mono); color: var(--muted); }
 .board .nick { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

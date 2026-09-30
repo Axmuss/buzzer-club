@@ -5,11 +5,13 @@ const crypto = require('crypto');
 const express = require('express');
 const { Server } = require('socket.io');
 const storage = require('./storage');
+const AVATARS = require('./public/avatars');
 
 const PORT = Number(process.env.PORT) || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 const sha = s => crypto.createHash('sha256').update(String(s)).digest();
 const ADMIN_TOKEN = ADMIN_PASSWORD
+  // The salt keeps its original name so existing builder logins stay valid after the rename to Quiz Club.
   ? crypto.createHmac('sha256', ADMIN_PASSWORD).update('buzzer-club-admin-v1').digest('hex')
   : null;
 const TIMES = [10, 15, 20, 30, 45];
@@ -100,7 +102,7 @@ app.get(['/join/:code', '/builder'], (req, res) => res.sendFile(path.join(PUBLIC
 
 app.use((err, req, res, next) => {
   console.error(err);
-  res.status(500).json({ error: 'The server hit a problem. Try again.' });
+  res.status(500).json({ error: 'The server hit a problem. Try again.', code: 'server' });
 });
 
 /* ---------------- Live game over Socket.IO ---------------- */
@@ -112,6 +114,7 @@ const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 const cleanNick = n => (typeof n === 'string' ? n.replace(/\s+/g, ' ').trim().slice(0, 20) : '');
 const cleanCode = c => (typeof c === 'string' ? c.trim().toUpperCase() : '');
+const cleanAvatar = a => (AVATARS.includes(a) ? a : AVATARS[crypto.randomInt(AVATARS.length)]);
 const isConnected = p => p.sockets.size > 0;
 
 function newCode() {
@@ -136,7 +139,7 @@ function standings(room) {
       if (i === upto) last = pts;
     }
     return {
-      pubId: p.pubId, nick: p.nick, connected: isConnected(p), isHost: p.id === room.hostId,
+      pubId: p.pubId, nick: p.nick, avatar: p.avatar, connected: isConnected(p), isHost: p.id === room.hostId,
       answered: room.status === 'question' && p.answers[room.index] !== undefined, total, last,
     };
   }).sort((a, b) => b.total - a.total || a.nick.localeCompare(b.nick));
@@ -244,14 +247,16 @@ io.on('connection', socket => {
     socket.data.code = null;
   }
 
-  function attach(room, nick) {
+  // nick/avatar are only passed when (re)joining; a resume keeps what the player already has.
+  function attach(room, nick, avatar) {
     if (socket.data.code && socket.data.code !== room.code) detach();
     let p = room.players.get(pid);
     if (!p) {
-      p = { id: pid, pubId: crypto.randomBytes(6).toString('hex'), nick, answers: {}, sockets: new Set() };
+      p = { id: pid, pubId: crypto.randomBytes(6).toString('hex'), nick, avatar: cleanAvatar(avatar), answers: {}, sockets: new Set() };
       room.players.set(pid, p);
     } else if (nick) {
       p.nick = nick;
+      p.avatar = cleanAvatar(avatar);
     }
     p.sockets.add(socket.id);
     socket.join(room.code);
@@ -262,34 +267,42 @@ io.on('connection', socket => {
   const on = (event, fn) => socket.on(event, async (data, ack) => {
     const reply = typeof ack === 'function' ? ack : () => {};
     try { reply((await fn(data && typeof data === 'object' ? data : {})) || { ok: true }); }
-    catch (e) { console.error(event, e); reply({ error: 'The server hit a problem. Try again.' }); }
+    catch (e) { console.error(event, e); reply({ error: 'The server hit a problem. Try again.', code: 'server' }); }
   });
 
-  on('room:create', async ({ quizId, nick }) => {
+  on('room:create', async ({ quizId, nick, avatar }) => {
     nick = cleanNick(nick);
-    if (!nick) return { error: 'Type your name first.' };
+    if (!nick) return { error: 'Type your name first.', code: 'name' };
     const quiz = typeof quizId === 'string' ? await storage.get(quizId) : null;
-    if (!quiz || !quiz.questions.length) return { error: 'That quiz is no longer available.' };
+    if (!quiz || !quiz.questions.length) return { error: 'That quiz is no longer available.', code: 'quiz_gone' };
     const room = {
       code: newCode(), quiz: snapshotQuiz(quiz), status: 'lobby', index: -1, hostId: pid,
       players: new Map(), qStart: 0, endsAt: 0, timer: null, lastActive: Date.now(),
     };
     rooms.set(room.code, room);
-    attach(room, nick);
+    attach(room, nick, avatar);
     broadcast(room);
     return { ok: true, code: room.code };
   });
 
-  on('room:join', async ({ code, nick }) => {
+  on('room:join', async ({ code, nick, avatar }) => {
     nick = cleanNick(nick);
     code = cleanCode(code);
-    if (!nick) return { error: 'Type your name first.' };
+    if (!nick) return { error: 'Type your name first.', code: 'name' };
     const room = rooms.get(code);
-    if (!room) return { error: `There's no game with code ${code || '…'} right now. Check the link with your host.` };
-    if (!room.players.has(pid) && room.players.size >= MAX_PLAYERS) return { error: 'This game is full.' };
-    attach(room, nick);
+    if (!room) return { error: `There's no game with code ${code || '…'} right now. Check the link with your host.`, code: 'no_room', gameCode: code };
+    if (!room.players.has(pid) && room.players.size >= MAX_PLAYERS) return { error: 'This game is full.', code: 'full' };
+    attach(room, nick, avatar);
     broadcast(room);
     return { ok: true, code };
+  });
+
+  on('player:avatar', async ({ avatar }) => {
+    const room = currentRoom();
+    if (!room) return { error: 'Join a game first.', code: 'need_room' };
+    if (!AVATARS.includes(avatar)) return { error: 'Pick one of the avatars shown.', code: 'bad_avatar' };
+    room.players.get(pid).avatar = avatar;
+    broadcast(room);
   });
 
   on('room:resume', async ({ code }) => {
@@ -317,18 +330,18 @@ io.on('connection', socket => {
 
   on('game:start', async () => {
     const room = hostRoom();
-    if (!room || room.status !== 'lobby') return { error: 'Only the host can start the game.' };
+    if (!room || room.status !== 'lobby') return { error: 'Only the host can start the game.', code: 'host_only' };
     startQuestion(room, 0);
   });
 
   on('game:answer', async ({ c }) => {
     const room = currentRoom();
-    if (!room || room.status !== 'question') return { error: 'Too late for this question.' };
+    if (!room || room.status !== 'question') return { error: 'Too late for this question.', code: 'too_late' };
     const p = room.players.get(pid);
     const now = Date.now();
-    if (p.answers[room.index] !== undefined) return { error: 'You already answered.' };
-    if (!Number.isInteger(c) || c < 0 || c > 3) return { error: 'Pick one of the four answers.' };
-    if (now > room.endsAt + GRACE_MS) return { error: 'Time is up for this question.' };
+    if (p.answers[room.index] !== undefined) return { error: 'You already answered.', code: 'already' };
+    if (!Number.isInteger(c) || c < 0 || c > 3) return { error: 'Pick one of the four answers.', code: 'bad_choice' };
+    if (now > room.endsAt + GRACE_MS) return { error: 'Time is up for this question.', code: 'time_up' };
     p.answers[room.index] = { c, ms: Math.min(now - room.qStart, room.endsAt - room.qStart) };
     broadcast(room);
     revealIfEveryoneAnswered(room);
@@ -350,9 +363,9 @@ io.on('connection', socket => {
 
   on('game:quiz', async ({ quizId }) => {
     const room = hostRoom();
-    if (!room || (room.status !== 'final' && room.status !== 'lobby')) return { error: 'You can change the quiz between games.' };
+    if (!room || (room.status !== 'final' && room.status !== 'lobby')) return { error: 'You can change the quiz between games.', code: 'between_games' };
     const quiz = typeof quizId === 'string' ? await storage.get(quizId) : null;
-    if (!quiz || !quiz.questions.length) return { error: 'That quiz is no longer available.' };
+    if (!quiz || !quiz.questions.length) return { error: 'That quiz is no longer available.', code: 'quiz_gone' };
     room.quiz = snapshotQuiz(quiz);
     resetForNewRound(room);
     broadcast(room);
@@ -370,7 +383,7 @@ io.on('connection', socket => {
     const room = currentRoom();
     if (!room) return;
     const host = room.players.get(room.hostId);
-    if (host && isConnected(host)) return { error: 'The host is still here.' };
+    if (host && isConnected(host)) return { error: 'The host is still here.', code: 'host_here' };
     room.hostId = pid;
     broadcast(room);
   });
@@ -389,7 +402,7 @@ setInterval(() => {
 
 storage.init().then(name => {
   server.listen(PORT, () => {
-    console.log(`Buzzer Club running on http://localhost:${PORT}`);
+    console.log(`Quiz Club running on http://localhost:${PORT}`);
     console.log(`Quiz storage: ${name}`);
     if (!ADMIN_PASSWORD) console.log('ADMIN_PASSWORD is not set, so the quiz builder is switched off.');
   });
