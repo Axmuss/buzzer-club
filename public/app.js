@@ -1,5 +1,12 @@
 'use strict';
-const SHAPES = ['▲', '◆', '●', '■'];
+const SHAPES = [
+  '<path d="M10 2.5 18.5 17.5h-17z"/>',
+  '<path d="M10 1.5 18.5 10 10 18.5 1.5 10z"/>',
+  '<circle cx="10" cy="10" r="7"/>',
+  '<rect x="2.5" y="2.5" width="15" height="15" rx="2"/>',
+];
+const badge = j => `<span class="badge" aria-hidden="true"><svg viewBox="0 0 20 20">${SHAPES[j]}</svg></span>`;
+const picks = n => `<span class="picks">${n} ${n === 1 ? 'pick' : 'picks'}</span>`;
 const TIMES = [10, 15, 20, 30, 45];
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -283,8 +290,11 @@ function questionView(st) {
   const mine = st.you?.answer ?? (S.pending && S.pending.key === key ? S.pending.c : null);
   const over = timeLeftMs() <= 0;
   const tiles = q.o.map((o, j) => {
-    const cls = mine != null ? (mine === j ? 'picked' : 'dim') : (over ? 'dim' : '');
-    return `<button class="tile t${j} ${cls}" data-act="answer" data-c="${j}" ${mine != null || over ? 'disabled' : ''}><span class="shape" aria-hidden="true">${SHAPES[j]}</span><span class="txt">${esc(o)}</span></button>`;
+    const picked = mine === j;
+    const off = mine != null ? !picked : over;
+    return `<button class="tile t${j} ${off ? 'off' : ''}" data-act="answer" data-c="${j}" ${mine != null || over ? 'disabled' : ''}>
+      ${badge(j)}<span class="txt">${esc(o)}</span>
+      ${picked ? '<span class="side"><span class="chip">Your answer</span></span>' : ''}</button>`;
   }).join('');
   const counts = `${st.answeredCount} of ${st.activeCount} answered.`;
   const status = mine != null ? `Locked in. ${counts}` : over ? `Time's up.` : counts;
@@ -308,11 +318,18 @@ function boardView(st, showDelta) {
 function revealView(st) {
   const q = st.question;
   const mine = st.you?.answer;
-  const tiles = q.o.map((o, j) => `<div class="tile t${j} ${j === st.correct ? 'right' : 'wrong'} ${mine === j ? 'picked' : ''}">
-      <span class="shape" aria-hidden="true">${SHAPES[j]}</span><span class="txt">${esc(o)}${j === st.correct ? ' ✓' : ''}</span>
-      <span class="count" title="Players who picked this">${st.counts[j]}</span></div>`).join('');
-  const res = mine == null ? `<p class="result bad">No answer</p>`
-    : st.you.points ? `<p class="result good">Correct · +${st.you.points}</p>` : `<p class="result bad">Not this time</p>`;
+  const tiles = q.o.map((o, j) => {
+    const right = j === st.correct, isMine = mine === j;
+    const cls = right ? 'win' : isMine ? 'off mine-wrong' : 'off';
+    const chip = right ? `<span class="chip good">✓ Correct</span>` : isMine ? `<span class="chip bad">Your answer</span>` : '';
+    return `<div class="tile t${j} ${cls}">
+      ${badge(j)}<span class="txt">${esc(o)}</span>
+      <span class="side">${chip}${picks(st.counts[j])}</span></div>`;
+  }).join('');
+  const answerText = esc(q.o[st.correct]);
+  const res = mine == null ? `<div class="result bad"><strong>No answer</strong><span>The answer was ${answerText}.</span></div>`
+    : st.you.points ? `<div class="result good"><strong>Correct</strong><span>+${st.you.points} points</span></div>`
+    : `<div class="result bad"><strong>Not this time</strong><span>The answer was ${answerText}.</span></div>`;
   const last = st.index + 1 >= st.total;
   return `<section class="stage">
     <p class="eyebrow">Question ${st.index + 1} of ${st.total} · the answer</p>
@@ -446,7 +463,7 @@ function editorView() {
       <textarea id="q${i}-q" data-f="q" data-i="${i}" rows="2" maxlength="300" placeholder="Type the question">${esc(q.q)}</textarea>
       <div class="opts">${q.o.map((o, j) => `<div class="opt t${j}">
         <input type="radio" name="c${i}" id="q${i}-c${j}" data-f="c" data-i="${i}" data-j="${j}" ${q.c === j ? 'checked' : ''} aria-label="Answer ${j + 1} is correct">
-        <span class="shape" aria-hidden="true">${SHAPES[j]}</span>
+        ${badge(j)}
         <input id="q${i}-o${j}" data-f="o" data-i="${i}" data-j="${j}" value="${esc(o)}" placeholder="Answer ${j + 1}" maxlength="120">
       </div>`).join('')}</div>
     </li>`).join('');
