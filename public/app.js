@@ -72,6 +72,7 @@ function showVolume() {
   $('#sound').firstElementChild.textContent = v === 0 ? '🔇' : v < 0.34 ? '🔈' : v < 0.67 ? '🔉' : '🔊';
   $('#sound').classList.toggle('off', v === 0);
   $('#vol').value = pct;
+  $('#vol').style.setProperty('--fill', pct + '%');
   $('#vol-val').textContent = pct + '%';
 }
 function toggleVolume(open) {
@@ -79,10 +80,21 @@ function toggleVolume(open) {
   pop.hidden = open === undefined ? !pop.hidden : !open;
   $('#sound').setAttribute('aria-expanded', !pop.hidden);
 }
-// Close the volume popover when tapping anywhere else.
-document.addEventListener('pointerdown', e => {
-  if (!$('#vol-pop').hidden && !e.target.closest('.vol-wrap')) toggleVolume(false);
+// Close the volume popover when tapping or clicking anywhere else. Browsers differ in which of these events a tap on
+// plain page areas produces (Safari can skip pointer events there), so listen for all of them in the capture phase.
+function closeVolumeIfOutside(e) {
+  if ($('#vol-pop').hidden) return;
+  const el = e.target instanceof Element ? e.target : e.target && e.target.parentElement;
+  if (!el || !el.closest('.vol-wrap')) toggleVolume(false);
+}
+for (const ev of ['pointerdown', 'mousedown', 'touchstart', 'click', 'focusin']) {
+  document.addEventListener(ev, closeVolumeIfOutside, { capture: true, passive: true });
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !$('#vol-pop').hidden) { toggleVolume(false); $('#sound').focus(); }
 });
+window.addEventListener('blur', () => toggleVolume(false));
+document.addEventListener('visibilitychange', () => { if (document.hidden) toggleVolume(false); });
 
 /* ---------- connection ---------- */
 const socket = io({ auth: { playerId: playerId() } });
@@ -485,7 +497,7 @@ function tick() {
   if (st.status === 'reveal' && st.nextAt) {
     const el = $('#next-in'), bar = $('#nbar');
     if (el) el.textContent = nextInText(st);
-    if (bar) bar.style.transform = `scaleX(${Math.min(1, nextLeftMs(st) / (st.revealMs || 8000))})`;
+    if (bar) bar.style.transform = `scaleX(${Math.min(1, nextLeftMs(st) / (st.revealMs || 5000))})`;
     return;
   }
   if (st.status !== 'question') return;

@@ -56,7 +56,14 @@ a { color: inherit; }
 .vol-wrap { position: relative; }
 .vol-pop { position: absolute; top: calc(100% + 8px); right: 0; z-index: 20; width: min(240px, calc(100vw - 32px)); background: var(--surface); border: 2px solid var(--ink); border-radius: 14px; padding: 12px 14px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 8px; }
 .vol-row { display: flex; align-items: center; gap: 10px; }
-.vol-row input[type="range"] { flex: 1; min-width: 0; padding: 0; border: 0; background: transparent; accent-color: var(--accent); height: 28px; }
+/* Slider drawn the same in every browser: rounded track filled up to the thumb (--fill is set from the page script). */
+.vol-row input[type="range"] { -webkit-appearance: none; appearance: none; flex: 1; min-width: 0; height: 28px; padding: 0; border: 0; background: transparent; cursor: pointer; --fill: 70%; }
+.vol-row input[type="range"]::-webkit-slider-runnable-track { height: 8px; border-radius: 999px; background: linear-gradient(to right, var(--accent) var(--fill), var(--line) var(--fill)); }
+.vol-row input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; margin-top: -6px; border-radius: 50%; background: var(--surface); border: 3px solid var(--accent); }
+.vol-row input[type="range"]::-moz-range-track { height: 8px; border-radius: 999px; background: var(--line); }
+.vol-row input[type="range"]::-moz-range-progress { height: 8px; border-radius: 999px; background: var(--accent); }
+.vol-row input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--surface); border: 3px solid var(--accent); }
+.vol-row input[type="range"]:focus-visible { outline: 3px solid var(--a2); outline-offset: 4px; border-radius: 999px; }
 .vol-row span { min-width: 4ch; text-align: right; font-size: .85rem; }
 .lang { display: flex; border: 2px solid var(--ink); border-radius: 999px; padding: 2px; background: var(--surface); }
 .lang button { border: 0; background: transparent; color: var(--ink); font: 700 .8rem var(--f-body); letter-spacing: .06em; padding: 4px 10px; border-radius: 999px; cursor: pointer; }
