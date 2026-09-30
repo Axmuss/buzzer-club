@@ -18,7 +18,7 @@ const TIMES = [10, 15, 20, 30, 45];
 const MAX_PLAYERS = 50;
 const ROOM_IDLE_MS = 30 * 60 * 1000;
 const GRACE_MS = 300;
-const REVEAL_MS = 8000; // how long the answer and leaderboard stay up before the game moves on by itself
+const REVEAL_MS = 5000; // how long the answer and leaderboard stay up before the game moves on by itself
 const PUBLIC = path.join(__dirname, 'public');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
