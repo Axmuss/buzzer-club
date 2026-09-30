@@ -17,6 +17,7 @@
     <a class="brand" href="/" data-link><span class="buzz" aria-hidden="true"></span>Quiz Club</a>
     <div class="top-right">
       <span id="conn" class="conn" role="status" hidden>Reconnecting…</span>
+      <button type="button" id="sound" class="sound-btn" data-act="sound" aria-pressed="true" aria-label="Mute sounds"><span aria-hidden="true">🔊</span></button>
       <div id="lang" class="lang" role="group" aria-label="Language">
         <button type="button" data-act="lang" data-lang="en" aria-pressed="true">EN</button>
         <button type="button" data-act="lang" data-lang="ru" aria-pressed="false">RU</button>
@@ -34,6 +35,7 @@
 <script src="/socket.io/socket.io.js"></script>
 <script src="/avatars.js"></script>
 <script src="/i18n.js"></script>
+<script src="/sound.js"></script>
 <script src="/app.js"></script>
 </body>
 </html>

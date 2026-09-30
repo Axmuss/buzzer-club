@@ -4,6 +4,8 @@
 const I18N = {
   en: {
     'lang.label': 'Language',
+    'sound.mute': 'Mute sounds',
+    'sound.unmute': 'Turn sounds on',
     'conn.reconnecting': 'Reconnecting…',
     'foot.scoring': 'Each question scores up to 1000 points. Faster correct answers score more.',
     'foot.builder': 'Quiz builder',
@@ -158,6 +160,8 @@ const I18N = {
 
   ru: {
     'lang.label': 'Язык',
+    'sound.mute': 'Выключить звук',
+    'sound.unmute': 'Включить звук',
     'conn.reconnecting': 'Переподключение…',
     'foot.scoring': 'За каждый вопрос — до 1000 очков. Чем быстрее верный ответ, тем больше очков.',
     'foot.builder': 'Конструктор викторин',
