@@ -61,4 +61,10 @@ Bookmark that address. It never changes, and updates you push to GitHub deploy t
 - **Games live in memory.** If the server restarts mid-game, that game ends and you host a new one. Quizzes are safe in the database.
 - **Adding questions with Claude:** ask Claude for questions "as Quiz Club JSON", in the format
   `{"questions":[{"q":"Question?","o":["A","B","C","D"],"c":0}]}`, where `c` is the position of the right answer counting from 0. In the builder, open a quiz, expand **Paste questions from Claude**, and paste the reply.
+- **Pictures, video and sound:** a question can carry `"media"`, given as a link:
+  - picture: `{"type":"image","url":"https://…/picture.jpg"}`
+  - video fragment: `{"type":"video","url":"https://youtu.be/…","start":"1:30","end":"1:45"}` (YouTube or a direct mp4 link)
+  - sound fragment: `{"type":"audio","url":"https://youtu.be/…","start":"0:10","end":"0:25"}` (YouTube with the picture hidden, or a direct mp3 link)
+
+  `start` and `end` are optional (`"1:30"` or `90`); a `?t=` in a YouTube link counts as the start. Optional `"t"` sets the question time: 10, 15, 20, 30, 45, 60 or 90 seconds. Media links are checked by `public/media.js`, shared by the server and the page.
 - **Up to 50 players** per game. Games nobody is connected to are cleaned up after 30 minutes.

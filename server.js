@@ -14,7 +14,8 @@ const ADMIN_TOKEN = ADMIN_PASSWORD
   // The salt keeps its original name so existing builder logins stay valid after the rename to Quiz Club.
   ? crypto.createHmac('sha256', ADMIN_PASSWORD).update('buzzer-club-admin-v1').digest('hex')
   : null;
-const TIMES = [10, 15, 20, 30, 45];
+const Media = require('./public/media');
+const TIMES = [10, 15, 20, 30, 45, 60, 90];
 const MAX_PLAYERS = 50;
 const ROOM_IDLE_MS = 30 * 60 * 1000;
 const GRACE_MS = 300;
@@ -52,7 +53,13 @@ function cleanQuiz(body) {
     const o = Array.isArray(x.o) ? x.o.slice(0, 4).map(s => str(s, 120)) : [];
     if (!q || o.length !== 4 || o.some(s => !s)) return { error: `Question ${i + 1} needs its text and all four answers.` };
     if (!Number.isInteger(x.c) || x.c < 0 || x.c > 3) return { error: `Question ${i + 1} needs a correct answer.` };
-    questions.push({ q, o, c: x.c, t: TIMES.includes(x.t) ? x.t : 20 });
+    const question = { q, o, c: x.c, t: TIMES.includes(x.t) ? x.t : 20 };
+    if (x.media && x.media.type) {
+      const media = Media.cleanMedia(x.media);
+      if (!media) return { error: `Question ${i + 1}: that media link can't be used. Use an image link, a YouTube link or a direct mp3/mp4 link.` };
+      question.media = media;
+    }
+    questions.push(question);
   }
   return { quiz: { title, blurb, questions } };
 }
@@ -167,7 +174,7 @@ function view(room, pid) {
     hostConnected: !!host && isConnected(host),
     you: me ? { pubId: me.pubId, isHost: pid === room.hostId, answer: myAns ? myAns.c : null, points: revealed ? pointsFor(q, myAns) : 0 } : null,
     players: standings(room),
-    question: showQ ? { q: q.q, o: q.o, t: q.t } : null,
+    question: showQ ? { q: q.q, o: q.o, t: q.t, media: q.media || null } : null,
     correct: revealed ? q.c : null,
     counts,
     answeredCount: room.status === 'question' ? active.filter(p => p.answers[room.index] !== undefined).length : 0,
