@@ -7,7 +7,7 @@ const SHAPES = [
 ];
 const badge = j => `<span class="badge" aria-hidden="true"><svg viewBox="0 0 20 20">${SHAPES[j]}</svg></span>`;
 const picks = n => `<span class="picks">${t('picks', { n })}</span>`;
-const TIMES = [10, 15, 20, 30, 45];
+const TIMES = [10, 15, 20, 30, 45, 60, 90];
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const rid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -51,7 +51,7 @@ function setLang(l) {
   if (!LANGS.includes(l) || l === LANG) return;
   LANG = l; lsSet('bc-lang', l);
   notice('');
-  applyStatic(); render();
+  applyStatic(); render(true);
 }
 function applyStatic() {
   document.documentElement.lang = LANG;
@@ -278,7 +278,21 @@ function preserve(fn) {
   fn();
   if (id) { const n = document.getElementById(id); if (n && n !== document.activeElement) { n.focus(); try { if (ss != null) n.setSelectionRange(ss, se); } catch {} } }
 }
-function render() { preserve(() => { $('#app').innerHTML = view(); }); tick(); }
+// While the same question stays on screen only its changing part (#q-dyn) is redrawn, so a playing clip keeps playing
+// when other players answer. Anything else redraws the whole page. force: redraw everything (e.g. language change).
+function render(force) {
+  const st = S.st;
+  const qKey = S.route === 'room' && st && st.status === 'question' ? st.code + ':' + st.index : null;
+  const shown = $('#app > .stage[data-qkey]');
+  if (!force && qKey && shown && shown.dataset.qkey === qKey) {
+    preserve(() => { $('#q-dyn').innerHTML = questionDynamic(st); });
+  } else {
+    MediaPlayer.destroy();
+    preserve(() => { $('#app').innerHTML = view(); });
+    if (qKey && st.question.media) mountMedia(st.question.media, qKey);
+  }
+  tick();
+}
 function view() {
   if (S.route === 'builder') return builderView();
   if (S.route === 'room' && S.st) return roomView(S.st);
@@ -399,6 +413,19 @@ function lobbyView(st) {
 function questionView(st) {
   const q = st.question;
   const key = st.code + ':' + st.index;
+  return `<section class="stage" data-qkey="${esc(key)}">
+    <div class="qtop"><span class="eyebrow">${t('qOf', { i: st.index + 1, n: st.total })}</span><span id="tnum" class="timer mono" aria-label="${esc(t('secondsLeft'))}">${Math.max(0, Math.ceil(timeLeftMs() / 1000))}</span></div>
+    <div class="bar" aria-hidden="true"><i id="tbar"></i></div>
+    <h1 class="qtext">${esc(q.q)}</h1>
+    ${q.media ? mediaShell(q.media) : ''}
+    <div id="q-dyn" class="q-dyn">${questionDynamic(st)}</div>
+  </section>`;
+}
+
+// The part of a question screen that changes while the question is open: answer tiles and status lines.
+function questionDynamic(st) {
+  const q = st.question;
+  const key = st.code + ':' + st.index;
   const mine = st.you?.answer ?? (S.pending && S.pending.key === key ? S.pending.c : null);
   const over = timeLeftMs() <= 0;
   const tiles = q.o.map((o, j) => {
@@ -410,14 +437,160 @@ function questionView(st) {
   }).join('');
   const counts = t('answered', { a: st.answeredCount, b: st.activeCount });
   const status = mine != null ? `${t('lockedIn')} ${counts}` : over ? t('timeUp') : counts;
-  return `<section class="stage">
-    <div class="qtop"><span class="eyebrow">${t('qOf', { i: st.index + 1, n: st.total })}</span><span id="tnum" class="timer mono" aria-label="${esc(t('secondsLeft'))}">${Math.max(0, Math.ceil(timeLeftMs() / 1000))}</span></div>
-    <div class="bar" aria-hidden="true"><i id="tbar"></i></div>
-    <h1 class="qtext">${esc(q.q)}</h1>
-    <div class="tiles">${tiles}</div>
+  return `<div class="tiles">${tiles}</div>
     <p class="status">${status}</p>
-    ${guestLine(st)}
-  </section>`;
+    ${guestLine(st)}`;
+}
+
+/* ---------- question media: picture, video or sound fragment ---------- */
+function mediaShell(m) {
+  if (m.type === 'image') {
+    return `<figure id="media-slot" class="qmedia image"><img src="${esc(m.url)}" alt="" referrerpolicy="no-referrer" decoding="async"></figure>`;
+  }
+  const audio = m.type === 'audio';
+  return `<div id="media-slot" class="qmedia ${audio ? 'audio' : 'video'}">
+    <div class="frame">
+      <div id="media-el"></div>
+      ${audio ? `<div class="cover" aria-hidden="true"><span class="eq"><i></i><i></i><i></i><i></i><i></i></span><span>${t('media.listen')}</span></div>` : ''}
+    </div>
+    <div class="media-bar">
+      <button class="btn small" data-act="media-toggle" id="media-toggle">${t('media.play')}</button>
+      <button class="btn small ghost" data-act="media-replay">${t('media.replay')}</button>
+      <span class="hint media-msg" id="media-msg"></span>
+    </div>
+  </div>`;
+}
+
+let ytApiPromise = null;
+function loadYouTubeApi() {
+  if (window.YT && window.YT.Player) return Promise.resolve(window.YT);
+  if (!ytApiPromise) {
+    ytApiPromise = new Promise(resolve => {
+      const prev = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => { if (prev) prev(); resolve(window.YT); };
+      const s = document.createElement('script');
+      s.src = 'https://www.youtube.com/iframe_api';
+      s.onerror = () => { ytApiPromise = null; resolve(null); };
+      document.head.appendChild(s);
+    });
+  }
+  return ytApiPromise;
+}
+
+// The one clip on screen. A YouTube player or an <audio>/<video> element, stopped at `end` by polling.
+const MediaPlayer = {
+  key: null, yt: null, el: null, poll: null, start: 0, end: null, playing: false,
+  destroy() {
+    clearInterval(this.poll);
+    try { if (this.yt) this.yt.destroy(); } catch {}
+    if (this.el) { this.el.pause(); this.el.removeAttribute('src'); }
+    Object.assign(this, { key: null, yt: null, el: null, poll: null, playing: false });
+  },
+  setPlaying(p) {
+    this.playing = p;
+    const b = $('#media-toggle'), slot = $('#media-slot');
+    if (b) b.textContent = p ? t('media.pause') : t('media.play');
+    if (slot) { slot.classList.toggle('playing', p); if (p) slot.classList.remove('needs-tap'); }
+    if (p) mediaMsg('');
+  },
+  play(fromStart) {
+    if (this.yt && this.yt.playVideo) {
+      if (fromStart) this.yt.seekTo(this.start, true);
+      this.yt.playVideo();
+    } else if (this.el) {
+      if (fromStart) this.el.currentTime = this.start;
+      this.el.play().catch(() => askForTap());
+    }
+  },
+  pause() {
+    if (this.yt && this.yt.pauseVideo) this.yt.pauseVideo();
+    else if (this.el) this.el.pause();
+  },
+  setVolume(v) {
+    try { if (this.yt && this.yt.setVolume) this.yt.setVolume(Math.round(v * 100)); } catch {}
+    if (this.el) this.el.volume = v;
+  },
+  // True when the fragment has played to its end, so "play" should start it over.
+  atEnd() {
+    const near = cur => this.end != null && cur >= this.end - 0.3;
+    try { if (this.yt && this.yt.getCurrentTime) return this.yt.getPlayerState() === 0 || near(this.yt.getCurrentTime()); } catch {}
+    return !!this.el && (this.el.ended || near(this.el.currentTime));
+  },
+};
+function mediaMsg(text) { const el = $('#media-msg'); if (el) el.textContent = text; }
+// Browsers may block a clip from starting by itself (common on phones); then the player has to tap play once.
+function askForTap() {
+  const slot = $('#media-slot');
+  if (slot && !MediaPlayer.playing) { slot.classList.add('needs-tap'); mediaMsg(t('media.tap')); }
+}
+
+function mountMedia(m, key) {
+  const slot = $('#media-slot');
+  if (!slot) return;
+  MediaPlayer.key = key;
+  if (m.type === 'image') {
+    slot.querySelector('img').addEventListener('error', () => {
+      slot.classList.add('broken');
+      slot.innerHTML = `<p class="media-err">${t('media.imgErr')}</p>`;
+    });
+    return;
+  }
+  MediaPlayer.start = m.start || 0;
+  MediaPlayer.end = m.end || null;
+  const yt = Media.youTube(m.url);
+  if (yt) mountYouTube(yt.id, m, key);
+  else mountFile(m);
+}
+
+function mountYouTube(id, m, key) {
+  loadYouTubeApi().then(YT => {
+    if (MediaPlayer.key !== key || !$('#media-el')) return; // question already changed
+    if (!YT) { showMediaUnavailable(m.url); return; }
+    MediaPlayer.yt = new YT.Player('media-el', {
+      videoId: id,
+      host: 'https://www.youtube-nocookie.com',
+      width: '100%', height: '100%',
+      playerVars: { start: MediaPlayer.start, autoplay: 1, controls: 0, disablekb: 1, fs: 0, rel: 0, playsinline: 1, iv_load_policy: 3, modestbranding: 1 },
+      events: {
+        onReady: e => {
+          e.target.setVolume(Math.round(Sound.volume * 100));
+          e.target.playVideo();
+          setTimeout(() => { if (MediaPlayer.key === key) askForTap(); }, 1500);
+        },
+        onStateChange: e => MediaPlayer.setPlaying(e.data === YT.PlayerState.PLAYING || e.data === YT.PlayerState.BUFFERING),
+        onError: () => showMediaUnavailable(m.url),
+      },
+    });
+    MediaPlayer.poll = setInterval(() => {
+      const p = MediaPlayer.yt;
+      if (!p || !p.getCurrentTime || !MediaPlayer.end) return;
+      if (MediaPlayer.playing && p.getCurrentTime() >= MediaPlayer.end) p.pauseVideo();
+    }, 250);
+  });
+}
+
+function mountFile(m) {
+  const audio = m.type === 'audio';
+  const el = document.createElement(audio ? 'audio' : 'video');
+  el.preload = 'auto';
+  el.playsInline = true;
+  el.src = m.url;
+  el.volume = Sound.volume;
+  $('#media-el').replaceWith(el);
+  el.id = 'media-el';
+  MediaPlayer.el = el;
+  el.addEventListener('loadedmetadata', () => { if (MediaPlayer.start) el.currentTime = MediaPlayer.start; MediaPlayer.play(false); });
+  el.addEventListener('play', () => MediaPlayer.setPlaying(true));
+  el.addEventListener('pause', () => MediaPlayer.setPlaying(false));
+  el.addEventListener('timeupdate', () => { if (MediaPlayer.end && el.currentTime >= MediaPlayer.end) el.pause(); });
+  el.addEventListener('error', () => showMediaUnavailable(null));
+}
+
+function showMediaUnavailable(url) {
+  const slot = $('#media-slot');
+  if (!slot) return;
+  slot.classList.add('broken');
+  slot.innerHTML = `<p class="media-err">${t('media.unavailable')}${url ? ` <a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${t('media.openYt')}</a>` : ''}</p>`;
 }
 
 function boardView(st, showDelta) {
@@ -448,6 +621,7 @@ function revealView(st) {
     <div class="next-bar" aria-hidden="true"><i id="nbar"></i></div>
     <p class="status" id="next-in" data-last="${last}">${nextInText(st)}</p>
     <h1 class="qtext">${esc(q.q)}</h1>
+    ${q.media && q.media.type === 'image' ? `<figure class="qmedia image small"><img src="${esc(q.media.url)}" alt="" referrerpolicy="no-referrer"></figure>` : ''}
     <div class="tiles">${tiles}</div>
     ${res}
     <h2>${t('leaderboard')}</h2>
@@ -581,7 +755,47 @@ function adminListView() {
   </div>`;
 }
 
-function blankQ() { return { q: '', o: ['', '', '', ''], c: 0, t: 20 }; }
+function blankQ() { return { q: '', o: ['', '', '', ''], c: 0, t: 20, m: blankMedia() }; }
+function blankMedia() { return { type: '', url: '', start: '', end: '' }; }
+// Stored media -> the editable form (times as "1:30" text) and back. fromDraftMedia returns null for "no media"
+// and undefined when the link can't be used.
+function toDraftMedia(m) {
+  return m ? { type: m.type, url: m.url, start: m.start ? Media.formatTime(m.start) : '', end: m.end ? Media.formatTime(m.end) : '' } : blankMedia();
+}
+function fromDraftMedia(m) {
+  if (!m || !m.type) return null;
+  return Media.cleanMedia({ type: m.type, url: m.url, start: m.start, end: m.end }) || undefined;
+}
+
+function mediaEditor(q, i) {
+  const m = q.m || blankMedia();
+  const types = [['', 'b.mNone'], ['image', 'b.mImage'], ['video', 'b.mVideo'], ['audio', 'b.mAudio']];
+  let body = '';
+  if (m.type) {
+    const clean = m.url.trim() ? fromDraftMedia(m) : null;
+    let preview = '';
+    if (m.url.trim() && !clean) preview = `<p class="err">${t('b.mBad')}</p>`;
+    else if (clean && clean.type === 'image') preview = `<img class="ed-thumb" src="${esc(clean.url)}" alt="" referrerpolicy="no-referrer">`;
+    else if (clean) {
+      const yt = Media.youTube(clean.url);
+      const span = (clean.start || clean.end) ? ` · ${Media.formatTime(clean.start || 0)}–${clean.end ? Media.formatTime(clean.end) : '…'}` : '';
+      preview = yt
+        ? `<div class="ed-yt"><img class="ed-thumb" src="https://i.ytimg.com/vi/${esc(yt.id)}/mqdefault.jpg" alt=""><span class="hint">${t('b.mPreviewYt')}${span}</span></div>`
+        : `<audio class="ed-audio" controls preload="none" src="${esc(clean.url)}"></audio><span class="hint">${span.slice(3)}</span>`;
+    }
+    body = `<input id="q${i}-mu" data-f="mu" data-i="${i}" value="${esc(m.url)}" maxlength="600" inputmode="url" placeholder="${esc(t(m.type === 'image' ? 'b.mUrlImg' : 'b.mUrlAv'))}">
+      ${m.type === 'image' ? '' : `<div class="media-times">
+        <label class="hint" for="q${i}-ms">${t('b.mStart')}</label><input id="q${i}-ms" data-f="ms" data-i="${i}" value="${esc(m.start)}" placeholder="0:00" inputmode="numeric">
+        <label class="hint" for="q${i}-me">${t('b.mEnd')}</label><input id="q${i}-me" data-f="me" data-i="${i}" value="${esc(m.end)}" placeholder="0:15" inputmode="numeric">
+      </div><p class="hint">${t('b.mTimeHint')}</p>`}
+      <div class="ed-preview">${preview}</div>`;
+  }
+  return `<div class="media-ed">
+    <div class="media-ed-head"><label class="hint" for="q${i}-mt">${t('b.media')}</label>
+      <select id="q${i}-mt" data-f="mt" data-i="${i}">${types.map(([v, k]) => `<option value="${v}" ${m.type === v ? 'selected' : ''}>${t(k)}</option>`).join('')}</select></div>
+    ${body}
+  </div>`;
+}
 
 function editorView() {
   const d = S.admin.draft;
@@ -600,6 +814,7 @@ function editorView() {
         ${badge(j)}
         <input id="q${i}-o${j}" data-f="o" data-i="${i}" data-j="${j}" value="${esc(o)}" placeholder="${esc(t('b.ansPh', { n: j + 1 }))}" maxlength="120">
       </div>`).join('')}</div>
+      ${mediaEditor(q, i)}
     </li>`).join('');
   return `<div class="stack">
     <div class="ed-head"><button class="link" data-act="cancel-edit">${t('b.all')}</button>
@@ -614,7 +829,7 @@ function editorView() {
       <textarea id="import-text" data-f="import" rows="5" placeholder='{"questions":[{"q":"Question?","o":["A","B","C","D"],"c":0}]}'>${esc(S.admin.importText)}</textarea>
       <div class="row"><button class="btn" data-act="import">${t('b.importBtn')}</button><span class="err">${S.admin.importErr ? t('b.importErr') : ''}</span></div>
     </details>
-    <p class="hint">${t('b.tickHint')}</p>
+    <p class="hint">${t('b.tickHint')} ${t('b.mTip')}</p>
     <ol class="qlist">${qs}</ol>
     <button class="btn wide" data-act="add-q">${t('b.addQ')}</button>
     <p id="ed-err" class="err" role="alert"></p>
@@ -626,7 +841,7 @@ function openEditor(q, copy) {
     id: copy ? rid('quiz-') : q.id,
     title: copy ? q.title + ' ' + t('b.copySuffix') : q.title,
     blurb: q.blurb || '',
-    questions: q.questions.map(x => ({ q: x.q, o: x.o.slice(), c: x.c, t: x.t })),
+    questions: q.questions.map(x => ({ q: x.q, o: x.o.slice(), c: x.c, t: x.t, m: toDraftMedia(x.media) })),
   } : { id: rid('quiz-'), title: '', blurb: '', questions: [blankQ()] };
   S.admin.importText = ''; S.admin.importErr = false;
   render(); window.scrollTo(0, 0);
@@ -635,12 +850,15 @@ function openEditor(q, copy) {
 async function saveQuiz() {
   const d = S.admin.draft, err = $('#ed-err');
   const questions = d.questions
-    .map(q => ({ q: q.q.trim(), o: q.o.map(o => o.trim()), c: q.c, t: q.t }))
+    .map(q => ({ q: q.q.trim(), o: q.o.map(o => o.trim()), c: q.c, t: q.t, media: fromDraftMedia(q.m) }))
     .filter(q => q.q || q.o.some(Boolean));
   if (!d.title.trim()) { err.textContent = t('b.errTitle'); $('#d-title').focus(); return; }
   const bad = questions.findIndex(q => !q.q || q.o.some(o => !o));
   if (!questions.length) { err.textContent = t('b.errNone'); return; }
   if (bad >= 0) { err.textContent = t('b.errQ', { n: bad + 1 }); return; }
+  const badMedia = questions.findIndex(q => q.media === undefined);
+  if (badMedia >= 0) { err.textContent = t('b.errMedia', { n: badMedia + 1 }); return; }
+  for (const q of questions) if (!q.media) delete q.media;
   try {
     await api('PUT', '/api/admin/quizzes/' + encodeURIComponent(d.id), { title: d.title, blurb: d.blurb, questions });
     S.admin.draft = null; S.quizzes = null;
@@ -661,7 +879,7 @@ function importQuestions() {
     const parsed = JSON.parse(text.slice(from, Math.max(text.lastIndexOf('}'), text.lastIndexOf(']')) + 1));
     const list = (Array.isArray(parsed) ? parsed : parsed.questions || [])
       .filter(x => x && typeof x.q === 'string' && Array.isArray(x.o) && x.o.length === 4 && Number.isInteger(x.c) && x.c >= 0 && x.c < 4)
-      .map(x => ({ q: x.q, o: x.o.map(String), c: x.c, t: TIMES.includes(x.t) ? x.t : 20 }));
+      .map(x => ({ q: x.q, o: x.o.map(String), c: x.c, t: TIMES.includes(x.t) ? x.t : 20, m: toDraftMedia(Media.cleanMedia(x.media)) }));
     if (!list.length) throw new Error();
     A.draft.questions = A.draft.questions.filter(q => q.q.trim() || q.o.some(o => o.trim())).concat(list);
     A.importText = ''; A.importErr = false;
@@ -690,6 +908,8 @@ document.addEventListener('click', e => {
     case 'toggle-avatars': S.avOpen = !S.avOpen; render(); break;
     case 'start': act('game:start'); break;
     case 'answer': answer(+b.dataset.c); break;
+    case 'media-toggle': if (MediaPlayer.playing) MediaPlayer.pause(); else MediaPlayer.play(MediaPlayer.atEnd()); break;
+    case 'media-replay': MediaPlayer.play(true); break;
     case 'next': act('game:next'); break;
     case 'rematch': act('game:rematch'); break;
     case 'switch-quiz': act('game:quiz', { quizId: $('#next-quiz').value }); break;
@@ -723,6 +943,7 @@ function onField(e) {
   const el = e.target;
   if (el.id === 'vol') {
     Sound.setVolume(el.value / 100);
+    MediaPlayer.setVolume(Sound.volume);
     showVolume();
     if (e.type === 'change') Sound.play('lock'); // a short sample at the new level once the slider is released
     return;
@@ -738,6 +959,13 @@ function onField(e) {
   else if (f === 'o') d.questions[i].o[j] = el.value;
   else if (f === 't') d.questions[i].t = +el.value;
   else if (f === 'c' && el.checked) d.questions[i].c = j;
+  else if (f === 'mt' || f === 'mu' || f === 'ms' || f === 'me') {
+    const m = d.questions[i].m || (d.questions[i].m = blankMedia());
+    m[{ mt: 'type', mu: 'url', ms: 'start', me: 'end' }[f]] = el.value;
+    // Redraw the editor (preview, start/end fields) once a choice is made or a field is left, not on every keystroke.
+    // Deferred so that when Tab moves focus to the next field, the redraw keeps focus there.
+    if (e.type === 'change') setTimeout(() => render(), 0);
+  }
 }
 document.addEventListener('input', onField);
 document.addEventListener('change', onField);
